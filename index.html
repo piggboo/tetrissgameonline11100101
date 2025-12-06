@@ -54,7 +54,8 @@
   <div class="wrap">
     <header>
       <h1>ULTIMATE TETRIS</h1>
-      <button id="muteBtn" title="Mute / Unmute">🔇</button>
+      <!-- Иконка по умолчанию: 🔇 (музыка пока выключена) -->
+      <button id="muteBtn" title="Включить/выключить музыку">🔇</button>
     </header>
 
     <div class="layout">
@@ -100,13 +101,20 @@
       </aside>
     </div>
 
-    <!-- music only -->
-    <audio id="bgAudio" src="bg.mp3" loop></audio>
-
+    <!-- Музыка только в одном элементе. Не запускается автоматически. -->
+    <audio id="bgAudio" src="bg.mp3" loop preload="none"></audio>
   </div>
 
   <script>
-    // --- GAME SETUP ---
+    /* ------------------------------
+       Ultimate Tetris — чистая версия
+       - НИКАКИХ SFX
+       - Музыя bg.mp3 есть, но НЕ включается автоматически
+       - Проигрывание/пауза — только через кнопку #muteBtn
+       - Никакие клики по канвасу или другие обработчики не вызывают bgAudio.play()
+       ------------------------------ */
+
+    // --- CORE SETUP ---
     const COLS = 10, ROWS = 20;
     const boardCanvas = document.getElementById('board');
     const ctx = boardCanvas.getContext('2d');
@@ -118,11 +126,13 @@
     const NEXT_SCALE = nextCanvas.width / 4;
     ctxNext.setTransform(NEXT_SCALE,0,0,NEXT_SCALE,0,0);
 
+    // State
     let arena = createMatrix(COLS, ROWS);
-    let player = {pos:{x:0,y:0},matrix:null};
-    let bag=[]; let nextKey=null;
-    let dropInterval = 1000, dropCounter = 0; let lastTime = 0; let paused=false; let gameOver=false;
-    let score=0, lines=0, level=1;
+    let player = { pos:{ x:0, y:0 }, matrix: null };
+    let bag = [], nextKey = null;
+    let dropInterval = 1000, dropCounter = 0, lastTime = 0;
+    let paused = false, gameOver = false;
+    let score = 0, lines = 0, level = 1;
 
     const PIECES = {
       I: [[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]],
@@ -137,16 +147,19 @@
     const COLORS = { I:'#38bdf8',J:'#6366f1',L:'#fb923c',O:'#f59e0b',S:'#10b981',T:'#f472b6',Z:'#ef4444' };
 
     function createMatrix(w,h){ const m=[]; for(let y=0;y<h;y++) m.push(new Array(w).fill(0)); return m; }
-    function drawCell(x,y,color,ctxLocal){ ctxLocal.fillStyle=color; ctxLocal.fillRect(x,y,1,1); ctxLocal.strokeStyle='rgba(0,0,0,0.15)'; ctxLocal.lineWidth=0.06; ctxLocal.strokeRect(x,y,1,1); }
+
+    function drawCell(x,y,color,ctxLocal){ ctxLocal.fillStyle = color; ctxLocal.fillRect(x,y,1,1); ctxLocal.strokeStyle='rgba(0,0,0,0.15)'; ctxLocal.lineWidth=0.06; ctxLocal.strokeRect(x,y,1,1); }
 
     function draw(){
       ctx.clearRect(0,0,COLS,ROWS);
-      ctx.fillStyle='#0e1116'; ctx.fillRect(0,0,COLS,ROWS);
+      ctx.fillStyle = '#0e1116'; ctx.fillRect(0,0,COLS,ROWS);
+
       for(let y=0;y<ROWS;y++){
         for(let x=0;x<COLS;x++){
           if(arena[y][x]) drawCell(x,y,arena[y][x],ctx);
         }
       }
+
       if(player.matrix){
         for(let y=0;y<player.matrix.length;y++){
           for(let x=0;x<player.matrix[y].length;x++){
@@ -156,16 +169,14 @@
       }
     }
 
-    function merge(){
-      player.matrix.forEach((row,y)=>row.forEach((val,x)=>{ if(val) arena[player.pos.y+y][player.pos.x+x]=val; }));
-    }
+    function merge(){ player.matrix.forEach((row,y)=>row.forEach((val,x)=>{ if(val) arena[player.pos.y+y][player.pos.x+x] = val; })); }
 
     function collide(){
       for(let y=0;y<player.matrix.length;y++){
         for(let x=0;x<player.matrix[y].length;x++){
           if(player.matrix[y][x]){
             const px = player.pos.x + x; const py = player.pos.y + y;
-            if(px<0 || px>=COLS || py>=ROWS || (py>=0 && arena[py][px])) return true;
+            if(px < 0 || px >= COLS || py >= ROWS || (py >= 0 && arena[py][px])) return true;
           }
         }
       }
@@ -173,8 +184,8 @@
     }
 
     function rotate(matrix,dir){
-      for(let y=0;y<matrix.length;y++) for(let x=0;x<y;x++) [matrix[x][y],matrix[y][x]]=[matrix[y][x],matrix[x][y]];
-      if(dir>0) matrix.forEach(row=>row.reverse()); else matrix.reverse();
+      for(let y=0;y<matrix.length;y++) for(let x=0;x<y;x++) [matrix[x][y],matrix[y][x]] = [matrix[y][x],matrix[x][y]];
+      if(dir > 0) matrix.forEach(row => row.reverse()); else matrix.reverse();
     }
 
     function playerReset(){
@@ -184,30 +195,57 @@
       player.pos.x = Math.floor((COLS - player.matrix[0].length)/2);
       nextKey = randPiece();
       drawNext();
-      if(collide()){ gameOver = true; paused=true; showOverlay(true); }
+      if(collide()){ gameOver = true; paused = true; showOverlay(true); }
     }
 
-    function randPiece(){ if(bag.length===0){ bag=Object.keys(PIECES).slice(); for(let i=bag.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [bag[i],bag[j]]=[bag[j],bag[i]]; } } return bag.pop(); }
-    function makeMat(k){ return PIECES[k].map(r=>r.map(v=>v?COLORS[k]:0)); }
+    function randPiece(){ if(bag.length === 0){ bag = Object.keys(PIECES).slice(); for(let i = bag.length - 1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [bag[i], bag[j]] = [bag[j], bag[i]]; } } return bag.pop(); }
+    function makeMat(k){ return PIECES[k].map(r => r.map(v => v ? COLORS[k] : 0)); }
 
-    function arenaSweep(){ let removed=0; outer: for(let y=ROWS-1;y>=0;y--){ for(let x=0;x<COLS;x++){ if(!arena[y][x]) continue outer; } const row = arena.splice(y,1)[0].fill(0); arena.unshift(row); removed++; y++; } if(removed){ lines+=removed; level=Math.floor(lines/10)+1; dropInterval=Math.max(120, 1000 - (level-1)*70); updateStats(); } return removed; }
+    function arenaSweep(){
+      let removed = 0;
+      outer: for(let y = ROWS - 1; y >= 0; y--){
+        for(let x=0;x<COLS;x++){ if(!arena[y][x]) continue outer; }
+        const row = arena.splice(y,1)[0].fill(0);
+        arena.unshift(row);
+        removed++;
+        y++;
+      }
+      if(removed){
+        lines += removed;
+        level = Math.floor(lines/10) + 1;
+        dropInterval = Math.max(120, 1000 - (level-1)*70);
+        updateStats();
+      }
+      return removed;
+    }
 
     function updateStats(){ document.getElementById('scoreVal').textContent = score; document.getElementById('levelVal').textContent = level; document.getElementById('linesVal').textContent = lines; }
 
-    function playerDrop(){ player.pos.y++; if(collide()){ player.pos.y--; merge(); const cleared = arenaSweep(); if(cleared) score += [0,100,300,500,800][cleared] || 0; playerReset(); } dropCounter=0; updateStats(); }
-    function playerHardDrop(){ while(!collide()) player.pos.y++; player.pos.y--; merge(); const cleared = arenaSweep(); if(cleared) score += [0,100,300,500,800][cleared] || 0; playerReset(); dropCounter=0; updateStats(); }
-    function playerMove(dir){ player.pos.x+=dir; if(collide()) player.pos.x-=dir; }
-    function playerRotate(dir){ const pos = player.pos.x; rotate(player.matrix,dir); let offset=1; while(collide()){ player.pos.x += offset; offset = -(offset + (offset>0?1:-1)); if(Math.abs(offset) > player.matrix[0].length){ rotate(player.matrix,-dir); player.pos.x = pos; return; } } }
+    function playerDrop(){ player.pos.y++; if(collide()){ player.pos.y--; merge(); const cleared = arenaSweep(); if(cleared) score += [0,100,300,500,800][cleared] || 0; playerReset(); } dropCounter = 0; updateStats(); }
+    function playerHardDrop(){ while(!collide()) player.pos.y++; player.pos.y--; merge(); const cleared = arenaSweep(); if(cleared) score += [0,100,300,500,800][cleared] || 0; playerReset(); dropCounter = 0; updateStats(); }
+    function playerMove(dir){ player.pos.x += dir; if(collide()) player.pos.x -= dir; }
+    function playerRotate(dir){ const pos = player.pos.x; rotate(player.matrix,dir); let offset = 1; while(collide()){ player.pos.x += offset; offset = -(offset + (offset>0?1:-1)); if(Math.abs(offset) > player.matrix[0].length){ rotate(player.matrix, -dir); player.pos.x = pos; return; } } }
 
-    function drawNext(){ ctxNext.setTransform(NEXT_SCALE,0,0,NEXT_SCALE,0,0); ctxNext.clearRect(0,0,4,4); ctxNext.fillStyle='rgba(0,0,0,0.0)'; ctxNext.fillRect(0,0,4,4);
+    function drawNext(){
+      ctxNext.setTransform(NEXT_SCALE,0,0,NEXT_SCALE,0,0);
+      ctxNext.clearRect(0,0,4,4);
+      ctxNext.fillStyle = 'rgba(0,0,0,0.0)';
+      ctxNext.fillRect(0,0,4,4);
       const mat = makeMat(nextKey);
-      const offsetX = (4 - mat[0].length)/2; const offsetY = (4 - mat.length)/2;
+      const offsetX = (4 - mat[0].length) / 2;
+      const offsetY = (4 - mat.length) / 2;
       for(let y=0;y<mat.length;y++) for(let x=0;x<mat[y].length;x++) if(mat[y][x]) drawCell(offsetX + x, offsetY + y, mat[y][x], ctxNext);
     }
 
-    function update(time=0){ const delta = time - lastTime; lastTime = time; dropCounter += delta; if(!paused && !gameOver && dropCounter > dropInterval) playerDrop(); draw(); requestAnimationFrame(update); }
+    function update(time = 0){
+      const delta = time - lastTime;
+      lastTime = time;
+      dropCounter += delta;
+      if(!paused && !gameOver && dropCounter > dropInterval) playerDrop();
+      draw();
+      requestAnimationFrame(update);
+    }
 
-    // overlay simple (alert) for game over
     function showOverlay(isGameOver){ if(isGameOver) alert('Game Over — нажми Restart'); else alert('Paused'); }
 
     // keyboard
@@ -220,48 +258,60 @@
       if(e.key.toLowerCase() === 'p'){ paused = !paused; if(paused) showOverlay(false); }
     });
 
-    // mobile touch bindings
-    function bindBtn(id, fn){ const el=document.getElementById(id); if(!el) return; el.addEventListener('touchstart', ev=>{ ev.preventDefault(); fn(); }, {passive:false}); el.addEventListener('mousedown', ev=>{ ev.preventDefault(); fn(); }); }
-    bindBtn('btnLeft', ()=>playerMove(-1)); bindBtn('btnRight', ()=>playerMove(1)); bindBtn('btnRotate', ()=>playerRotate(1)); bindBtn('btnSoft', ()=>playerDrop()); bindBtn('btnHard', ()=>playerHardDrop()); bindBtn('btnPause', ()=>{ paused=!paused; if(paused) showOverlay(false); });
+    // mobile touch bindings (no audio calls here)
+    function bindBtn(id, fn){ const el = document.getElementById(id); if(!el) return; el.addEventListener('touchstart', ev => { ev.preventDefault(); fn(); }, {passive:false}); el.addEventListener('mousedown', ev => { ev.preventDefault(); fn(); }); }
+    bindBtn('btnLeft', () => playerMove(-1));
+    bindBtn('btnRight', () => playerMove(1));
+    bindBtn('btnRotate', () => playerRotate(1));
+    bindBtn('btnSoft', () => playerDrop());
+    bindBtn('btnHard', () => playerHardDrop());
+    bindBtn('btnPause', () => { paused = !paused; if(paused) showOverlay(false); });
 
     // restart
     document.getElementById('restartBtn').addEventListener('click', startGame);
 
-    function startGame(){ arena = createMatrix(COLS,ROWS); bag=[]; nextKey = randPiece(); playerReset(); score=0; lines=0; level=1; dropInterval=1000; paused=false; gameOver=false; updateStats(); lastTime=0; requestAnimationFrame(update); }
+    function startGame(){
+      arena = createMatrix(COLS,ROWS);
+      bag = [];
+      nextKey = randPiece();
+      playerReset();
+      score = 0;
+      lines = 0;
+      level = 1;
+      dropInterval = 1000;
+      paused = false;
+      gameOver = false;
+      updateStats();
+      lastTime = 0;
+      requestAnimationFrame(update);
+    }
 
-    // init game
+    // init
     startGame();
-
-    // draw initial next
     drawNext();
 
-    // --- MUSIC CONTROL (only bg.mp3) ---
-    const bgAudio = document.getElementById('bgAudio');
+    /* ------------------------------
+       MUSIC CONTROL (ONLY HERE)
+       - bgAudio exists but NEVER запускается где-либо кроме этой кнопки
+       - удалены все другие вызовы bgAudio.play() из кода игры
+       - клики по игровому полю не запустят музыку
+       ------------------------------ */
+    const bgAudio = document.getElementById('bgAudio'); // src already set in markup
     const muteBtn = document.getElementById('muteBtn');
-
-    // Initial state: paused. User toggles playback with the button.
-    // Some browsers block autoplay; so we let user start via button (or any first interaction).
     let musicPlaying = false;
 
-    // Try to unlock / play music on first user gesture only if the user already attempted to play
-    function tryPlayAfterUserGesture() {
-      // No automatic play here; function exists in case you want to call bgAudio.play() on first click
-      // We do not call it automatically to avoid interrupting user.
-    }
-    window.addEventListener('click', tryPlayAfterUserGesture, { once: true });
-    window.addEventListener('keydown', tryPlayAfterUserGesture, { once: true });
-
-    // Button toggles play/pause of the background music only.
+    // Toggle play/pause exclusively via the button
     muteBtn.addEventListener('click', () => {
-      // If audio not loaded, set src to bg.mp3 (it is set in markup, but some cases may want explicit)
-      if (!bgAudio.src) bgAudio.src = 'bg.mp3';
+      // ensure src present (markup already sets it, but keep safe)
+      if(!bgAudio.src) bgAudio.src = 'bg.mp3';
 
-      if (!musicPlaying) {
+      if(!musicPlaying){
+        // try to play; some browsers may block play() if no user gesture - but the click on button is a user gesture
         bgAudio.play().then(() => {
           musicPlaying = true;
           muteBtn.textContent = '🔊';
         }).catch(() => {
-          // Play blocked by browser autoplay policy — keep button as '🔇'
+          // if play is blocked, keep icon as muted and don't throw errors
           musicPlaying = false;
           muteBtn.textContent = '🔇';
         });
@@ -272,7 +322,9 @@
       }
     });
 
-    // Ensure no other game actions call bgAudio.play() anywhere — music won't restart on moves/rotates.
+    // IMPORTANT: Ensure no other handlers call bgAudio.play() or change musicPlaying.
+    // No automatic play or window-level click/keydown unlocking is registered here.
+
   </script>
 </body>
 </html>
