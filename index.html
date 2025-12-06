@@ -54,7 +54,7 @@
   <div class="wrap">
     <header>
       <h1>ULTIMATE TETRIS</h1>
-      <button id="muteBtn" title="Mute / Unmute">🔊</button>
+      <button id="muteBtn" title="Mute / Unmute">🔇</button>
     </header>
 
     <div class="layout">
@@ -99,25 +99,25 @@
         <button class="restart" id="restartBtn">Restart</button>
       </aside>
     </div>
-    <audio id="bgAudio" loop></audio>
+
+    <!-- music only -->
+    <audio id="bgAudio" src="bg.mp3" loop></audio>
+
   </div>
 
   <script>
-    // --- BASIC TETRIS ENGINE (compact & stable) ---
-    const COLS = 10, ROWS = 20; // logical
+    // --- GAME SETUP ---
+    const COLS = 10, ROWS = 20;
     const boardCanvas = document.getElementById('board');
     const ctx = boardCanvas.getContext('2d');
-    // Use CSS pixels mapping to logical cells
-    const cellPixel = Math.floor(boardCanvas.width / COLS); // 32
+    const cellPixel = Math.floor(boardCanvas.width / COLS);
     ctx.scale(cellPixel, cellPixel);
 
     const nextCanvas = document.getElementById('next');
     const ctxNext = nextCanvas.getContext('2d');
-    // we'll draw next using logical 4x4 grid scaled to canvas
     const NEXT_SCALE = nextCanvas.width / 4;
     ctxNext.setTransform(NEXT_SCALE,0,0,NEXT_SCALE,0,0);
 
-    // game state
     let arena = createMatrix(COLS, ROWS);
     let player = {pos:{x:0,y:0},matrix:null};
     let bag=[]; let nextKey=null;
@@ -140,17 +140,13 @@
     function drawCell(x,y,color,ctxLocal){ ctxLocal.fillStyle=color; ctxLocal.fillRect(x,y,1,1); ctxLocal.strokeStyle='rgba(0,0,0,0.15)'; ctxLocal.lineWidth=0.06; ctxLocal.strokeRect(x,y,1,1); }
 
     function draw(){
-      // clear whole board
       ctx.clearRect(0,0,COLS,ROWS);
-      // grid background
       ctx.fillStyle='#0e1116'; ctx.fillRect(0,0,COLS,ROWS);
-      // draw arena
       for(let y=0;y<ROWS;y++){
         for(let x=0;x<COLS;x++){
           if(arena[y][x]) drawCell(x,y,arena[y][x],ctx);
         }
       }
-      // draw player
       if(player.matrix){
         for(let y=0;y<player.matrix.length;y++){
           for(let x=0;x<player.matrix[y].length;x++){
@@ -236,43 +232,47 @@
     // init game
     startGame();
 
-    // Audio auto-load from bg.mp3 placed next to index.html
-    const bgAudio = document.getElementById('bgAudio');
-    const muteBtn = document.getElementById('muteBtn');
-    fetch('bg.mp3', { method:'HEAD' }).then(r=>{ if(r.ok){ bgAudio.src = 'bg.mp3'; bgAudio.volume = 0.5; bgAudio.play().catch(()=>{}); } }).catch(()=>{});
-
-    muteBtn.addEventListener('click', ()=>{ if(bgAudio.paused) { bgAudio.play().catch(()=>{}); muteBtn.textContent='🔊'; } else { bgAudio.muted = !bgAudio.muted; muteBtn.textContent = bgAudio.muted ? '🔇' : '🔊'; } });
-
     // draw initial next
     drawNext();
-// ---- BACKGROUND MUSIC ----
-let bgMusic = new Audio("bg.mp3");
-bgMusic.loop = true;
-bgMusic.volume = 0.6;
 
-// Автозапуск возможен только после взаимодействия с пользователем
-let musicUnlocked = false;
+    // --- MUSIC CONTROL (only bg.mp3) ---
+    const bgAudio = document.getElementById('bgAudio');
+    const muteBtn = document.getElementById('muteBtn');
 
-function unlockMusic() {
-    if (!musicUnlocked) {
-        bgMusic.play().catch(() => {});
-        musicUnlocked = true;
+    // Initial state: paused. User toggles playback with the button.
+    // Some browsers block autoplay; so we let user start via button (or any first interaction).
+    let musicPlaying = false;
+
+    // Try to unlock / play music on first user gesture only if the user already attempted to play
+    function tryPlayAfterUserGesture() {
+      // No automatic play here; function exists in case you want to call bgAudio.play() on first click
+      // We do not call it automatically to avoid interrupting user.
     }
-}
+    window.addEventListener('click', tryPlayAfterUserGesture, { once: true });
+    window.addEventListener('keydown', tryPlayAfterUserGesture, { once: true });
 
-// Разрешаем музыку после клика или нажатия клавиши
-window.addEventListener("click", unlockMusic);
-window.addEventListener("keydown", unlockMusic);
+    // Button toggles play/pause of the background music only.
+    muteBtn.addEventListener('click', () => {
+      // If audio not loaded, set src to bg.mp3 (it is set in markup, but some cases may want explicit)
+      if (!bgAudio.src) bgAudio.src = 'bg.mp3';
 
-// Кнопка включения/выключения
-function toggleSound() {
-    if (bgMusic.paused) {
-        bgMusic.play();
-    } else {
-        bgMusic.pause();
-    }
-}
+      if (!musicPlaying) {
+        bgAudio.play().then(() => {
+          musicPlaying = true;
+          muteBtn.textContent = '🔊';
+        }).catch(() => {
+          // Play blocked by browser autoplay policy — keep button as '🔇'
+          musicPlaying = false;
+          muteBtn.textContent = '🔇';
+        });
+      } else {
+        bgAudio.pause();
+        musicPlaying = false;
+        muteBtn.textContent = '🔇';
+      }
+    });
 
+    // Ensure no other game actions call bgAudio.play() anywhere — music won't restart on moves/rotates.
   </script>
 </body>
 </html>
