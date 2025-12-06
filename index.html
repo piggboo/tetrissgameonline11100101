@@ -99,6 +99,9 @@
         <button class="restart" id="restartBtn">Restart</button>
       </aside>
     </div>
+
+    <footer>Помести <strong>bg.mp3</strong> рядом с этим <em>index.html</em> — музыка загрузится автоматически.</footer>
+
     <audio id="bgAudio" loop></audio>
   </div>
 
@@ -238,41 +241,34 @@
 
     // Audio auto-load from bg.mp3 placed next to index.html
     const bgAudio = document.getElementById('bgAudio');
-    const muteBtn = document.getElementById('muteBtn');
-    fetch('bg.mp3', { method:'HEAD' }).then(r=>{ if(r.ok){ bgAudio.src = 'bg.mp3'; bgAudio.volume = 0.5; bgAudio.play().catch(()=>{}); } }).catch(()=>{});
+const muteBtn = document.getElementById('muteBtn');
 
-    muteBtn.addEventListener('click', ()=>{ if(bgAudio.paused) { bgAudio.play().catch(()=>{}); muteBtn.textContent='🔊'; } else { bgAudio.muted = !bgAudio.muted; muteBtn.textContent = bgAudio.muted ? '🔇' : '🔊'; } });
-
-    // draw initial next
-    drawNext();
-// ---- BACKGROUND MUSIC ----
-let bgMusic = new Audio("bg.mp3");
-bgMusic.loop = true;
-bgMusic.volume = 0.6;
-
-// Автозапуск возможен только после взаимодействия с пользователем
+// --- Unlock music by first user interaction ---
 let musicUnlocked = false;
-
 function unlockMusic() {
     if (!musicUnlocked) {
-        bgMusic.play().catch(() => {});
+        bgAudio.play().catch(()=>{});
         musicUnlocked = true;
     }
 }
+window.addEventListener('click', unlockMusic);
+window.addEventListener('keydown', unlockMusic);
 
-// Разрешаем музыку после клика или нажатия клавиши
-window.addEventListener("click", unlockMusic);
-window.addEventListener("keydown", unlockMusic);
-
-// Кнопка включения/выключения
-function toggleSound() {
-    if (bgMusic.paused) {
-        bgMusic.play();
-    } else {
-        bgMusic.pause();
+// Load audio file
+fetch('bg.mp3', { method:'HEAD' }).then(r => {
+    if (r.ok) {
+        bgAudio.src = 'bg.mp3';
+        bgAudio.volume = 0.5;
     }
-}
+}).catch(()=>{})(()=>{}); } }).catch(()=>{});
 
+    muteBtn.addEventListener('click', () => {
+    bgAudio.muted = !bgAudio.muted;
+    muteBtn.textContent = bgAudio.muted ? '🔇' : '🔊';
+}); muteBtn.textContent='🔊'; } else { bgAudio.muted = !bgAudio.muted; muteBtn.textContent = bgAudio.muted ? '🔇' : '🔊'; } });
+
+    // draw initial next
+    drawNext();
   </script>
 </body>
 </html>
